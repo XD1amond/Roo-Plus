@@ -3,6 +3,7 @@
 import delay from "delay"
 import * as vscode from "vscode"
 import { ClineProvider } from "./core/webview/ClineProvider"
+import { MobileProvider } from "./core/mobile/MobileProvider"
 import { createClineAPI } from "./exports"
 import "./utils/path" // necessary to have access to String.prototype.toPosix
 import { DIFF_VIEW_URI_SCHEME } from "./integrations/editor/DiffViewProvider"
@@ -35,11 +36,13 @@ export function activate(context: vscode.ExtensionContext) {
 	}
 
 	const sidebarProvider = new ClineProvider(context, outputChannel)
+	const mobileProvider = new MobileProvider(context, outputChannel)
 
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(ClineProvider.sideBarId, sidebarProvider, {
 			webviewOptions: { retainContextWhenHidden: true },
 		}),
+		mobileProvider
 	)
 
 	context.subscriptions.push(

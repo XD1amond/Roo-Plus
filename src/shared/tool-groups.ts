@@ -1,3 +1,4 @@
+
 // Define tool group values
 export type ToolGroupValues = readonly string[]
 
@@ -11,6 +12,7 @@ export const TOOL_DISPLAY_NAMES = {
 	list_files: "list files",
 	list_code_definition_names: "list definitions",
 	browser_action: "use a browser",
+	mobile_action: "use mobile devices",
 	use_mcp_tool: "use mcp tools",
 	access_mcp_resource: "access mcp resources",
 	ask_followup_question: "ask questions",
@@ -22,6 +24,7 @@ export const TOOL_GROUPS: Record<string, ToolGroupValues> = {
 	read: ["read_file", "search_files", "list_files", "list_code_definition_names"],
 	edit: ["write_to_file", "apply_diff"],
 	browser: ["browser_action"],
+	mobile: ["mobile_action"],
 	command: ["execute_command"],
 	mcp: ["use_mcp_tool", "access_mcp_resource"],
 }
@@ -48,6 +51,7 @@ export const GROUP_DISPLAY_NAMES: Record<ToolGroup, string> = {
 	read: "Read Files",
 	edit: "Edit Files",
 	browser: "Use Browser",
+	mobile: "Use Mobile Devices",
 	command: "Run Commands",
 	mcp: "Use MCP",
 }

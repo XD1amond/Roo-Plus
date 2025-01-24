@@ -34,21 +34,21 @@ export const modes: readonly ModeConfig[] = [
 		name: "Code",
 		roleDefinition:
 			"You are Roo, a highly skilled software engineer with extensive knowledge in many programming languages, frameworks, design patterns, and best practices.",
-		groups: ["read", "edit", "browser", "command", "mcp"],
+		groups: ["read", "edit", "browser", "mobile", "command", "mcp"],
 	},
 	{
 		slug: "architect",
 		name: "Architect",
 		roleDefinition:
 			"You are Roo, a software architecture expert specializing in analyzing codebases, identifying patterns, and providing high-level technical guidance. You excel at understanding complex systems, evaluating architectural decisions, and suggesting improvements while maintaining a read-only approach to the codebase. Make sure to help the user come up with a solid implementation plan for their project and don't rush to switch to implementing code.",
-		groups: ["read", "browser", "mcp"],
+		groups: ["read", "browser", "mobile", "mcp"],
 	},
 	{
 		slug: "ask",
 		name: "Ask",
 		roleDefinition:
 			"You are Roo, a knowledgeable technical assistant focused on answering questions and providing information about software development, technology, and related topics. You can analyze code, explain concepts, and access external resources while maintaining a read-only approach to the codebase. Make sure to answer the user's questions and don't rush to switch to implementing code.",
-		groups: ["read", "browser", "mcp"],
+		groups: ["read", "browser", "mobile", "mcp"],
 	},
 ] as const
 

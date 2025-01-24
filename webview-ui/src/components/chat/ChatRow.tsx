@@ -2,6 +2,7 @@ import { VSCodeBadge, VSCodeButton, VSCodeProgressRing } from "@vscode/webview-u
 import deepEqual from "fast-deep-equal"
 import React, { memo, useEffect, useMemo, useRef, useState } from "react"
 import { useSize } from "react-use"
+import { ChatRowContainer, ChatRowHeader } from "./styles"
 import {
 	ClineApiReqInfo,
 	ClineAskUseMcpServer,
@@ -32,27 +33,19 @@ interface ChatRowProps {
 
 interface ChatRowContentProps extends Omit<ChatRowProps, "onHeightChange"> {}
 
-const ChatRow = memo(
+export default memo(
 	(props: ChatRowProps) => {
 		const { isLast, onHeightChange, message } = props
-		// Store the previous height to compare with the current height
-		// This allows us to detect changes without causing re-renders
 		const prevHeightRef = useRef(0)
 
 		const [chatrow, { height }] = useSize(
-			<div
-				style={{
-					padding: "10px 6px 10px 15px",
-				}}>
+			<ChatRowContainer isLast={isLast}>
 				<ChatRowContent {...props} />
-			</div>,
+			</ChatRowContainer>,
 		)
 
 		useEffect(() => {
-			// used for partials, command output, etc.
-			// NOTE: it's important we don't distinguish between partial or complete here since our scroll effects in chatview need to handle height change during partial -> complete
-			const isInitialRender = prevHeightRef.current === 0 // prevents scrolling when new element is added since we already scroll for that
-			// height starts off at Infinity
+			const isInitialRender = prevHeightRef.current === 0
 			if (isLast && height !== 0 && height !== Infinity && height !== prevHeightRef.current) {
 				if (!isInitialRender) {
 					onHeightChange(height > prevHeightRef.current)
@@ -61,14 +54,10 @@ const ChatRow = memo(
 			}
 		}, [height, isLast, onHeightChange, message])
 
-		// we cannot return null as virtuoso does not support it, so we use a separate visibleMessages array to filter out messages that should not be rendered
 		return chatrow
 	},
-	// memo does shallow comparison of props, so we need to do deep comparison of arrays/objects whose properties might change
 	deepEqual,
 )
-
-export default ChatRow
 
 export const ChatRowContent = ({
 	message,
@@ -86,9 +75,9 @@ export const ChatRowContent = ({
 		}
 		return [undefined, undefined, undefined]
 	}, [message.text, message.say])
-	// when resuming task, last wont be api_req_failed but a resume_task message, so api_req_started will show loading spinner. that's why we just remove the last api_req_started that failed without streaming anything
+
 	const apiRequestFailedMessage =
-		isLast && lastModifiedMessage?.ask === "api_req_failed" // if request is retried then the latest message is a api_req_retried
+		isLast && lastModifiedMessage?.ask === "api_req_failed"
 			? lastModifiedMessage?.text
 			: undefined
 	const isCommandExecuting =
@@ -129,6 +118,13 @@ export const ChatRowContent = ({
 							style={{ color: normalColor, marginBottom: "-1.5px" }}></span>
 					),
 					<span style={{ color: normalColor, fontWeight: "bold" }}>Roo wants to execute this command:</span>,
+				]
+			case "mobile_action":
+				return [
+					<span
+						className="codicon codicon-device-mobile"
+						style={{ color: normalColor, marginBottom: "-1.5px" }}></span>,
+					<span style={{ color: normalColor, fontWeight: "bold" }}>Roo wants to perform a mobile action:</span>,
 				]
 			case "use_mcp_server":
 				const mcpServerUse = JSON.parse(message.text || "{}") as ClineAskUseMcpServer
@@ -246,10 +242,10 @@ export const ChatRowContent = ({
 			case "appliedDiff":
 				return (
 					<>
-						<div style={headerStyle}>
+						<ChatRowHeader>
 							{toolIcon(tool.tool === "appliedDiff" ? "diff" : "edit")}
 							<span style={{ fontWeight: "bold" }}>Roo wants to edit this file:</span>
-						</div>
+						</ChatRowHeader>
 						<CodeAccordian
 							isLoading={message.partial}
 							diff={tool.diff!}
@@ -262,10 +258,10 @@ export const ChatRowContent = ({
 			case "newFileCreated":
 				return (
 					<>
-						<div style={headerStyle}>
+						<ChatRowHeader>
 							{toolIcon("new-file")}
 							<span style={{ fontWeight: "bold" }}>Roo wants to create a new file:</span>
-						</div>
+						</ChatRowHeader>
 						<CodeAccordian
 							isLoading={message.partial}
 							code={tool.content!}
@@ -278,18 +274,12 @@ export const ChatRowContent = ({
 			case "readFile":
 				return (
 					<>
-						<div style={headerStyle}>
+						<ChatRowHeader>
 							{toolIcon("file-code")}
 							<span style={{ fontWeight: "bold" }}>
 								{message.type === "ask" ? "Roo wants to read this file:" : "Roo read this file:"}
 							</span>
-						</div>
-						{/* <CodeAccordian
-							code={tool.content!}
-							path={tool.path!}
-							isExpanded={isExpanded}
-							onToggleExpand={onToggleExpand}
-						/> */}
+						</ChatRowHeader>
 						<div
 							style={{
 								borderRadius: 3,
@@ -335,14 +325,14 @@ export const ChatRowContent = ({
 			case "listFilesTopLevel":
 				return (
 					<>
-						<div style={headerStyle}>
+						<ChatRowHeader>
 							{toolIcon("folder-opened")}
 							<span style={{ fontWeight: "bold" }}>
 								{message.type === "ask"
 									? "Roo wants to view the top level files in this directory:"
 									: "Roo viewed the top level files in this directory:"}
 							</span>
-						</div>
+						</ChatRowHeader>
 						<CodeAccordian
 							code={tool.content!}
 							path={tool.path!}
@@ -355,14 +345,14 @@ export const ChatRowContent = ({
 			case "listFilesRecursive":
 				return (
 					<>
-						<div style={headerStyle}>
+						<ChatRowHeader>
 							{toolIcon("folder-opened")}
 							<span style={{ fontWeight: "bold" }}>
 								{message.type === "ask"
 									? "Roo wants to recursively view all files in this directory:"
 									: "Roo recursively viewed all files in this directory:"}
 							</span>
-						</div>
+						</ChatRowHeader>
 						<CodeAccordian
 							code={tool.content!}
 							path={tool.path!}
@@ -375,14 +365,14 @@ export const ChatRowContent = ({
 			case "listCodeDefinitionNames":
 				return (
 					<>
-						<div style={headerStyle}>
+						<ChatRowHeader>
 							{toolIcon("file-code")}
 							<span style={{ fontWeight: "bold" }}>
 								{message.type === "ask"
 									? "Roo wants to view source code definition names used in this directory:"
 									: "Roo viewed source code definition names used in this directory:"}
 							</span>
-						</div>
+						</ChatRowHeader>
 						<CodeAccordian
 							code={tool.content!}
 							path={tool.path!}
@@ -394,7 +384,7 @@ export const ChatRowContent = ({
 			case "searchFiles":
 				return (
 					<>
-						<div style={headerStyle}>
+						<ChatRowHeader>
 							{toolIcon("search")}
 							<span style={{ fontWeight: "bold" }}>
 								{message.type === "ask" ? (
@@ -407,7 +397,7 @@ export const ChatRowContent = ({
 									</>
 								)}
 							</span>
-						</div>
+						</ChatRowHeader>
 						<CodeAccordian
 							code={tool.content!}
 							path={tool.path! + (tool.filePattern ? `/(${tool.filePattern})` : "")}
@@ -417,32 +407,6 @@ export const ChatRowContent = ({
 						/>
 					</>
 				)
-			// case "inspectSite":
-			// 	const isInspecting =
-			// 		isLast && lastModifiedMessage?.say === "inspect_site_result" && !lastModifiedMessage?.images
-			// 	return (
-			// 		<>
-			// 			<div style={headerStyle}>
-			// 				{isInspecting ? <ProgressIndicator /> : toolIcon("inspect")}
-			// 				<span style={{ fontWeight: "bold" }}>
-			// 					{message.type === "ask" ? (
-			// 						<>Roo wants to inspect this website:</>
-			// 					) : (
-			// 						<>Roo is inspecting this website:</>
-			// 					)}
-			// 				</span>
-			// 			</div>
-			// 			<div
-			// 				style={{
-			// 					borderRadius: 3,
-			// 					border: "1px solid var(--vscode-editorGroup-border)",
-			// 					overflow: "hidden",
-			// 					backgroundColor: CODE_BLOCK_BG_COLOR,
-			// 				}}>
-			// 				<CodeBlock source={`${"```"}shell\n${tool.path}\n${"```"}`} forceWrap={true} />
-			// 			</div>
-			// 		</>
-			// 	)
 			default:
 				return null
 		}
@@ -496,39 +460,6 @@ export const ChatRowContent = ({
 											</>
 										)}
 									</p>
-
-									{/* {apiProvider === "" && (
-											<div
-												style={{
-													display: "flex",
-													alignItems: "center",
-													backgroundColor:
-														"color-mix(in srgb, var(--vscode-errorForeground) 20%, transparent)",
-													color: "var(--vscode-editor-foreground)",
-													padding: "6px 8px",
-													borderRadius: "3px",
-													margin: "10px 0 0 0",
-													fontSize: "12px",
-												}}>
-												<i
-													className="codicon codicon-warning"
-													style={{
-														marginRight: 6,
-														fontSize: 16,
-														color: "var(--vscode-errorForeground)",
-													}}></i>
-												<span>
-													Uh-oh, this could be a problem on end. We've been alerted and
-													will resolve this ASAP. You can also{" "}
-													<a
-														href=""
-														style={{ color: "inherit", textDecoration: "underline" }}>
-														contact us
-													</a>
-													.
-												</span>
-											</div>
-										)} */}
 								</>
 							)}
 
@@ -619,10 +550,10 @@ export const ChatRowContent = ({
 					return (
 						<>
 							{title && (
-								<div style={headerStyle}>
+								<ChatRowHeader>
 									{icon}
 									{title}
-								</div>
+								</ChatRowHeader>
 							)}
 							<p style={{ ...pStyle, color: "var(--vscode-errorForeground)" }}>{message.text}</p>
 						</>
@@ -630,10 +561,10 @@ export const ChatRowContent = ({
 				case "completion_result":
 					return (
 						<>
-							<div style={headerStyle}>
+							<ChatRowHeader>
 								{icon}
 								{title}
-							</div>
+							</ChatRowHeader>
 							<div style={{ color: "var(--vscode-charts-green)", paddingTop: 10 }}>
 								<Markdown markdown={message.text} />
 							</div>
@@ -703,10 +634,10 @@ export const ChatRowContent = ({
 					return (
 						<>
 							{title && (
-								<div style={headerStyle}>
+								<ChatRowHeader>
 									{icon}
 									{title}
-								</div>
+								</ChatRowHeader>
 							)}
 							<div style={{ paddingTop: 10 }}>
 								<Markdown markdown={message.text} partial={message.partial} />
@@ -719,10 +650,10 @@ export const ChatRowContent = ({
 				case "mistake_limit_reached":
 					return (
 						<>
-							<div style={headerStyle}>
+							<ChatRowHeader>
 								{icon}
 								{title}
-							</div>
+							</ChatRowHeader>
 							<p style={{ ...pStyle, color: "var(--vscode-errorForeground)" }}>{message.text}</p>
 						</>
 					)
@@ -759,14 +690,10 @@ export const ChatRowContent = ({
 					const { command, output } = splitMessage(message.text || "")
 					return (
 						<>
-							<div style={headerStyle}>
+							<ChatRowHeader>
 								{icon}
 								{title}
-							</div>
-							{/* <Terminal
-								rawOutput={command + (output ? "\n" + output : "")}
-								shouldAllowInput={!!isCommandExecuting && output.length > 0}
-							/> */}
+							</ChatRowHeader>
 							<div
 								style={{
 									borderRadius: 3,
@@ -803,10 +730,10 @@ export const ChatRowContent = ({
 					const server = mcpServers.find((server) => server.name === useMcpServer.serverName)
 					return (
 						<>
-							<div style={headerStyle}>
+							<ChatRowHeader>
 								{icon}
 								{title}
-							</div>
+							</ChatRowHeader>
 
 							<div
 								style={{
@@ -880,10 +807,10 @@ export const ChatRowContent = ({
 					if (message.text) {
 						return (
 							<div>
-								<div style={headerStyle}>
+								<ChatRowHeader>
 									{icon}
 									{title}
-								</div>
+								</ChatRowHeader>
 								<div style={{ color: "var(--vscode-charts-green)", paddingTop: 10 }}>
 									<Markdown markdown={message.text} partial={message.partial} />
 								</div>
@@ -896,10 +823,10 @@ export const ChatRowContent = ({
 					return (
 						<>
 							{title && (
-								<div style={headerStyle}>
+								<ChatRowHeader>
 									{icon}
 									{title}
-								</div>
+								</ChatRowHeader>
 							)}
 							<div style={{ paddingTop: 10 }}>
 								<Markdown markdown={message.text} />
@@ -954,33 +881,33 @@ const Markdown = memo(({ markdown, partial }: { markdown?: string; partial?: boo
 								from { opacity: 0; }
 								to { opacity: 1.0; }
 							}
-						`}
-					</style>
-					<VSCodeButton
-						className="copy-button"
-						appearance="icon"
-						style={{
-							height: "24px",
-							border: "none",
-							background: "var(--vscode-editor-background)",
-							transition: "background 0.2s ease-in-out",
-						}}
-						onClick={() => {
-							navigator.clipboard.writeText(markdown)
-							// Flash the button background briefly to indicate success
-							const button = document.activeElement as HTMLElement
-							if (button) {
-								button.style.background = "var(--vscode-button-background)"
-								setTimeout(() => {
-									button.style.background = ""
-								}, 200)
-							}
-						}}
-						title="Copy as markdown">
-						<span className="codicon codicon-copy"></span>
-					</VSCodeButton>
-				</div>
-			)}
-		</div>
-	)
-})
+							`}
+						</style>
+						<VSCodeButton
+							className="copy-button"
+							appearance="icon"
+							style={{
+								height: "24px",
+								border: "none",
+								background: "var(--vscode-editor-background)",
+								transition: "background 0.2s ease-in-out",
+							}}
+							onClick={() => {
+								navigator.clipboard.writeText(markdown)
+								// Flash the button background briefly to indicate success
+								const button = document.activeElement as HTMLElement
+								if (button) {
+									button.style.background = "var(--vscode-button-background)"
+									setTimeout(() => {
+										button.style.background = ""
+									}, 200)
+								}
+							}}
+							title="Copy as markdown">
+							<span className="codicon codicon-copy"></span>
+						</VSCodeButton>
+					</div>
+				)}
+			</div>
+		)
+	})

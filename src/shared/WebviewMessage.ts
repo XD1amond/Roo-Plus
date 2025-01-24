@@ -1,5 +1,6 @@
 import { ApiConfiguration, ApiProvider } from "./api"
 import { Mode, PromptComponent, ModeConfig } from "./modes"
+import { ClineSayMobileAction } from "./ExtensionMessage"
 
 export type PromptMode = Mode | "enhance"
 
@@ -78,6 +79,8 @@ export interface WebviewMessage {
 		| "deleteCustomMode"
 		| "setopenAiCustomModelInfo"
 		| "openCustomModesSettings"
+		| "alwaysAllowMobile"
+		| "mobile_action"
 	text?: string
 	disabled?: boolean
 	askResponse?: ClineAskResponse
@@ -98,6 +101,7 @@ export interface WebviewMessage {
 	query?: string
 	slug?: string
 	modeConfig?: ModeConfig
+	mobileAction?: ClineSayMobileAction
 }
 
 export type ClineAskResponse = "yesButtonClicked" | "noButtonClicked" | "messageResponse"

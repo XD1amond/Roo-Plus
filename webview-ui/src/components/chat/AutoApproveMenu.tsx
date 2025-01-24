@@ -26,6 +26,8 @@ const AutoApproveMenu = ({ style }: AutoApproveMenuProps) => {
 		setAlwaysAllowExecute,
 		alwaysAllowBrowser,
 		setAlwaysAllowBrowser,
+		alwaysAllowMobile,
+		setAlwaysAllowMobile,
 		alwaysAllowMcp,
 		setAlwaysAllowMcp,
 		alwaysApproveResubmit,
@@ -63,6 +65,13 @@ const AutoApproveMenu = ({ style }: AutoApproveMenuProps) => {
 			shortName: "Browser",
 			enabled: alwaysAllowBrowser ?? false,
 			description: "Allows ability to launch and interact with any website in a headless browser.",
+		},
+		{
+			id: "useMobile",
+			label: "Use mobile emulators",
+			shortName: "Mobile",
+			enabled: alwaysAllowMobile ?? false,
+			description: "Allows ability to launch and interact with mobile device emulators.",
 		},
 		{
 			id: "useMcp",
@@ -114,6 +123,12 @@ const AutoApproveMenu = ({ style }: AutoApproveMenuProps) => {
 		vscode.postMessage({ type: "alwaysAllowBrowser", bool: newValue })
 	}, [alwaysAllowBrowser, setAlwaysAllowBrowser])
 
+	const handleMobileChange = useCallback(() => {
+		const newValue = !(alwaysAllowMobile ?? false)
+		setAlwaysAllowMobile(newValue)
+		vscode.postMessage({ type: "alwaysAllowMobile", bool: newValue })
+	}, [alwaysAllowMobile, setAlwaysAllowMobile])
+
 	const handleMcpChange = useCallback(() => {
 		const newValue = !(alwaysAllowMcp ?? false)
 		setAlwaysAllowMcp(newValue)
@@ -132,6 +147,7 @@ const AutoApproveMenu = ({ style }: AutoApproveMenuProps) => {
 		editFiles: handleWriteChange,
 		executeCommands: handleExecuteChange,
 		useBrowser: handleBrowserChange,
+		useMobile: handleMobileChange,
 		useMcp: handleMcpChange,
 		retryRequests: handleRetryChange,
 	}

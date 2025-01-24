@@ -13,9 +13,10 @@ import { getTheme } from "../../integrations/theme/getTheme"
 import { getDiffStrategy } from "../diff/DiffStrategy"
 import WorkspaceTracker from "../../integrations/workspace/WorkspaceTracker"
 import { McpHub } from "../../services/mcp/McpHub"
+import { MobileProvider } from "../mobile/MobileProvider"
 import { ApiConfiguration, ApiProvider, ModelInfo } from "../../shared/api"
 import { findLast } from "../../shared/array"
-import { ApiConfigMeta, ExtensionMessage } from "../../shared/ExtensionMessage"
+import { ApiConfigMeta, ExtensionMessage, ClineSayMobileAction } from "../../shared/ExtensionMessage"
 import { HistoryItem } from "../../shared/HistoryItem"
 import { WebviewMessage } from "../../shared/WebviewMessage"
 import {
@@ -74,6 +75,7 @@ type GlobalStateKey =
 	| "alwaysAllowWrite"
 	| "alwaysAllowExecute"
 	| "alwaysAllowBrowser"
+	| "alwaysAllowMobile"
 	| "taskHistory"
 	| "openAiBaseUrl"
 	| "openAiModelId"
@@ -131,6 +133,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 	private cline?: Cline
 	private workspaceTracker?: WorkspaceTracker
 	mcpHub?: McpHub
+	private mobileProvider?: MobileProvider
+	private currentMobileAction?: ClineSayMobileAction
 	private latestAnnouncementId = "jan-21-2025-custom-modes" // update to some unique identifier when we add a new announcement
 	configManager: ConfigManager
 	customModesManager: CustomModesManager
@@ -143,6 +147,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		ClineProvider.activeInstances.add(this)
 		this.workspaceTracker = new WorkspaceTracker(this)
 		this.mcpHub = new McpHub(this)
+		this.mobileProvider = new MobileProvider(this.context, this.outputChannel)
 		this.configManager = new ConfigManager(this.context)
 		this.customModesManager = new CustomModesManager(this.context, async () => {
 			await this.postStateToWebview()
@@ -172,6 +177,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		this.workspaceTracker = undefined
 		this.mcpHub?.dispose()
 		this.mcpHub = undefined
+		this.mobileProvider?.cleanup()
+		this.mobileProvider = undefined
 		this.customModesManager?.dispose()
 		this.outputChannel.appendLine("Disposed all disposables")
 		ClineProvider.activeInstances.delete(this)
@@ -549,6 +556,49 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 					case "alwaysAllowBrowser":
 						await this.updateGlobalState("alwaysAllowBrowser", message.bool ?? undefined)
 						await this.postStateToWebview()
+						break
+					case "alwaysAllowMobile":
+						await this.updateGlobalState("alwaysAllowMobile", message.bool ?? undefined)
+						await this.postStateToWebview()
+						break
+					case "mobile_action":
+						if (message.mobileAction) {
+							try {
+								// Store current action for auto-approval handling
+								this.currentMobileAction = message.mobileAction
+
+								// Check if action should be auto-approved
+								const { alwaysAllowMobile } = await this.getState()
+								if (!alwaysAllowMobile) {
+									// If not auto-approved, ask for confirmation
+									const answer = await vscode.window.showInformationMessage(
+										`Allow mobile action: ${message.mobileAction.action}?`,
+										{ modal: true },
+										"Yes",
+										"Yes, and don't ask again",
+										"No"
+									)
+									
+									if (answer === "Yes, and don't ask again") {
+										await this.updateGlobalState("alwaysAllowMobile", true)
+										await this.postStateToWebview()
+									} else if (answer !== "Yes") {
+										throw new Error("Mobile action was not approved")
+									}
+								}
+
+								const result = await this.mobileProvider?.handleMobileAction(message.mobileAction)
+								await this.postMessageToWebview({
+									type: "mobile_action_result",
+									...result
+								})
+							} catch (error) {
+								console.error("Mobile action error:", error)
+								vscode.window.showErrorMessage(`Mobile action failed: ${error.message}`)
+							} finally {
+								this.currentMobileAction = undefined
+							}
+						}
 						break
 					case "alwaysAllowMcp":
 						await this.updateGlobalState("alwaysAllowMcp", message.bool)
@@ -1736,6 +1786,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			alwaysAllowWrite,
 			alwaysAllowExecute,
 			alwaysAllowBrowser,
+			alwaysAllowMobile,
 			alwaysAllowMcp,
 			soundEnabled,
 			diffEnabled,
@@ -1769,6 +1820,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			alwaysAllowWrite: alwaysAllowWrite ?? false,
 			alwaysAllowExecute: alwaysAllowExecute ?? false,
 			alwaysAllowBrowser: alwaysAllowBrowser ?? false,
+			alwaysAllowMobile: alwaysAllowMobile ?? false,
 			alwaysAllowMcp: alwaysAllowMcp ?? false,
 			uriScheme: vscode.env.uriScheme,
 			clineMessages: this.cline?.clineMessages || [],
@@ -1892,6 +1944,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			alwaysAllowWrite,
 			alwaysAllowExecute,
 			alwaysAllowBrowser,
+			alwaysAllowMobile,
 			alwaysAllowMcp,
 			taskHistory,
 			allowedCommands,
@@ -1957,6 +2010,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			this.getGlobalState("alwaysAllowWrite") as Promise<boolean | undefined>,
 			this.getGlobalState("alwaysAllowExecute") as Promise<boolean | undefined>,
 			this.getGlobalState("alwaysAllowBrowser") as Promise<boolean | undefined>,
+			this.getGlobalState("alwaysAllowMobile") as Promise<boolean | undefined>,
 			this.getGlobalState("alwaysAllowMcp") as Promise<boolean | undefined>,
 			this.getGlobalState("taskHistory") as Promise<HistoryItem[] | undefined>,
 			this.getGlobalState("allowedCommands") as Promise<string[] | undefined>,
@@ -2041,6 +2095,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			alwaysAllowWrite: alwaysAllowWrite ?? false,
 			alwaysAllowExecute: alwaysAllowExecute ?? false,
 			alwaysAllowBrowser: alwaysAllowBrowser ?? false,
+			alwaysAllowMobile: alwaysAllowMobile ?? false,
 			alwaysAllowMcp: alwaysAllowMcp ?? false,
 			taskHistory,
 			allowedCommands,

@@ -8,6 +8,7 @@ import {
 	ClineAsk,
 	ClineMessage,
 	ClineSayBrowserAction,
+	ClineSayMobileAction,
 	ClineSayTool,
 	ExtensionMessage,
 } from "../../../../src/shared/ExtensionMessage"
@@ -22,6 +23,7 @@ import HistoryPreview from "../history/HistoryPreview"
 import { normalizeApiConfiguration } from "../settings/ApiOptions"
 import Announcement from "./Announcement"
 import BrowserSessionRow from "./BrowserSessionRow"
+import MobileSessionRow from "./MobileSessionRow"
 import ChatRow from "./ChatRow"
 import ChatTextArea from "./ChatTextArea"
 import TaskHeader from "./TaskHeader"
@@ -46,6 +48,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		apiConfiguration,
 		mcpServers,
 		alwaysAllowBrowser,
+		alwaysAllowMobile,
 		alwaysAllowReadOnly,
 		alwaysAllowWrite,
 		alwaysAllowExecute,
@@ -151,6 +154,16 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 							}
 							setTextAreaDisabled(isPartial)
 							setClineAsk("browser_action_launch")
+							setEnableButtons(!isPartial)
+							setPrimaryButtonText("Approve")
+							setSecondaryButtonText("Reject")
+							break
+						case "mobile_action":
+							if (!isAutoApproved(lastMessage)) {
+								playSound("notification")
+							}
+							setTextAreaDisabled(isPartial)
+							setClineAsk("mobile_action")
 							setEnableButtons(!isPartial)
 							setPrimaryButtonText("Approve")
 							setSecondaryButtonText("Reject")
@@ -336,13 +349,46 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 	/*
 	This logic depends on the useEffect[messages] above to set clineAsk, after which buttons are shown and we then send an askResponse to the extension.
 	*/
-	const handlePrimaryButtonClick = useCallback(() => {
+	const handlePrimaryButtonClick = useCallback(async () => {
 		switch (clineAsk) {
 			case "api_req_failed":
+				vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
+				break
 			case "command":
 			case "command_output":
+				vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
+				break
 			case "tool":
+				vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
+				break
 			case "browser_action_launch":
+				vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
+				break
+			case "mobile_action":
+				if (lastMessage?.text) {
+					// Parse XML format
+					const parser = new DOMParser()
+					const xmlDoc = parser.parseFromString(lastMessage.text, "text/xml")
+					const mobileAction: ClineSayMobileAction = {
+						action: xmlDoc.querySelector("action")?.textContent as any,
+						deviceId: xmlDoc.querySelector("deviceId")?.textContent || undefined,
+						platform: xmlDoc.querySelector("platform")?.textContent as any || undefined,
+						deviceName: xmlDoc.querySelector("deviceName")?.textContent || undefined,
+						coordinate: xmlDoc.querySelector("coordinate")?.textContent || undefined,
+						startCoordinate: xmlDoc.querySelector("startCoordinate")?.textContent || undefined,
+						endCoordinate: xmlDoc.querySelector("endCoordinate")?.textContent || undefined,
+						duration: xmlDoc.querySelector("duration")?.textContent ? parseInt(xmlDoc.querySelector("duration")?.textContent || "0") : undefined,
+						text: xmlDoc.querySelector("text")?.textContent || undefined,
+						orientation: xmlDoc.querySelector("orientation")?.textContent as any || undefined
+					}
+					// Add delay for mobile actions
+					await new Promise((resolve) => setTimeout(resolve, writeDelayMs))
+					vscode.postMessage({
+						type: "mobile_action",
+						mobileAction
+					})
+				}
+				break
 			case "use_mcp_server":
 			case "resume_task":
 			case "mistake_limit_reached":
@@ -562,6 +608,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 
 			return (
 				(alwaysAllowBrowser && message.ask === "browser_action_launch") ||
+				(alwaysAllowMobile && message.ask === "mobile_action") ||
 				(alwaysAllowReadOnly && message.ask === "tool" && isReadOnlyToolAction(message)) ||
 				(alwaysAllowWrite && message.ask === "tool" && isWriteToolAction(message)) ||
 				(alwaysAllowExecute && message.ask === "command" && isAllowedCommand(message)) ||
@@ -571,6 +618,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		[
 			autoApprovalEnabled,
 			alwaysAllowBrowser,
+			alwaysAllowMobile,
 			alwaysAllowReadOnly,
 			isReadOnlyToolAction,
 			alwaysAllowWrite,
@@ -628,56 +676,86 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		return false
 	}
 
+	const isMobileSessionMessage = (message: ClineMessage): boolean => {
+		if (message.type === "ask") {
+			return ["mobile_action"].includes(message.ask!)
+		}
+		if (message.type === "say") {
+			return ["api_req_started", "text", "mobile_action", "mobile_action_result"].includes(message.say!)
+		}
+		return false
+	}
+
 	const groupedMessages = useMemo(() => {
 		const result: (ClineMessage | ClineMessage[])[] = []
 		let currentGroup: ClineMessage[] = []
 		let isInBrowserSession = false
+		let isInMobileSession = false
 
-		const endBrowserSession = () => {
+		const endSession = () => {
 			if (currentGroup.length > 0) {
 				result.push([...currentGroup])
 				currentGroup = []
 				isInBrowserSession = false
+				isInMobileSession = false
 			}
 		}
 
 		visibleMessages.forEach((message) => {
 			if (message.ask === "browser_action_launch") {
-				// complete existing browser session if any
-				endBrowserSession()
-				// start new
+				// complete existing session if any
+				endSession()
+				// start new browser session
 				isInBrowserSession = true
 				currentGroup.push(message)
-			} else if (isInBrowserSession) {
+			} else if (message.ask === "mobile_action") {
+				// complete existing session if any
+				endSession()
+				// start new mobile session
+				isInMobileSession = true
+				currentGroup.push(message)
+			} else if (isInBrowserSession || isInMobileSession) {
 				// end session if api_req_started is cancelled
 
 				if (message.say === "api_req_started") {
-					// get last api_req_started in currentGroup to check if it's cancelled. If it is then this api req is not part of the current browser session
+					// get last api_req_started in currentGroup to check if it's cancelled. If it is then this api req is not part of the current session
 					const lastApiReqStarted = [...currentGroup].reverse().find((m) => m.say === "api_req_started")
 					if (lastApiReqStarted?.text != null) {
 						const info = JSON.parse(lastApiReqStarted.text)
 						const isCancelled = info.cancelReason != null
 						if (isCancelled) {
-							endBrowserSession()
+							endSession()
 							result.push(message)
 							return
 						}
 					}
 				}
 
-				if (isBrowserSessionMessage(message)) {
+				if (isInBrowserSession && isBrowserSessionMessage(message)) {
 					currentGroup.push(message)
 
 					// Check if this is a close action
 					if (message.say === "browser_action") {
 						const browserAction = JSON.parse(message.text || "{}") as ClineSayBrowserAction
 						if (browserAction.action === "close") {
-							endBrowserSession()
+							endSession()
+						}
+					}
+				} else if (isInMobileSession && isMobileSessionMessage(message)) {
+					currentGroup.push(message)
+
+					// Check if this is a close action
+					if (message.say === "mobile_action") {
+						const parser = new DOMParser()
+						const xmlDoc = parser.parseFromString(message.text || "", "text/xml")
+						const action = xmlDoc.querySelector("action")?.textContent
+						if (action === "close") {
+							endSession()
 						}
 					}
 				} else {
-					// complete existing browser session if any
-					endBrowserSession()
+					// complete existing session if any
+					endSession()
 					result.push(message)
 				}
 			} else {
@@ -817,25 +895,48 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 
 	const itemContent = useCallback(
 		(index: number, messageOrGroup: ClineMessage | ClineMessage[]) => {
-			// browser session group
+			// session group
 			if (Array.isArray(messageOrGroup)) {
-				return (
-					<BrowserSessionRow
-						messages={messageOrGroup}
-						isLast={index === groupedMessages.length - 1}
-						lastModifiedMessage={modifiedMessages.at(-1)}
-						onHeightChange={handleRowHeightChange}
-						isStreaming={isStreaming}
-						// Pass handlers for each message in the group
-						isExpanded={(messageTs: number) => expandedRows[messageTs] ?? false}
-						onToggleExpand={(messageTs: number) => {
-							setExpandedRows((prev) => ({
-								...prev,
-								[messageTs]: !prev[messageTs],
-							}))
-						}}
-					/>
-				)
+				// Check if this is a mobile session by looking at the first message
+				const isMobileSession = messageOrGroup[0].ask === "mobile_action" ||
+					messageOrGroup[0].say === "mobile_action" ||
+					messageOrGroup[0].say === "mobile_action_result"
+
+				if (isMobileSession) {
+					return (
+						<MobileSessionRow
+							messages={messageOrGroup}
+							isLast={index === groupedMessages.length - 1}
+							lastModifiedMessage={modifiedMessages.at(-1)}
+							onHeightChange={handleRowHeightChange}
+							isStreaming={isStreaming}
+							isExpanded={(messageTs: number) => expandedRows[messageTs] ?? false}
+							onToggleExpand={(messageTs: number) => {
+								setExpandedRows((prev) => ({
+									...prev,
+									[messageTs]: !prev[messageTs],
+								}))
+							}}
+						/>
+					)
+				} else {
+					return (
+						<BrowserSessionRow
+							messages={messageOrGroup}
+							isLast={index === groupedMessages.length - 1}
+							lastModifiedMessage={modifiedMessages.at(-1)}
+							onHeightChange={handleRowHeightChange}
+							isStreaming={isStreaming}
+							isExpanded={(messageTs: number) => expandedRows[messageTs] ?? false}
+							onToggleExpand={(messageTs: number) => {
+								setExpandedRows((prev) => ({
+									...prev,
+									[messageTs]: !prev[messageTs],
+								}))
+							}}
+						/>
+					)
+				}
 			}
 
 			// regular message
@@ -881,6 +982,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		enableButtons,
 		handlePrimaryButtonClick,
 		alwaysAllowBrowser,
+		alwaysAllowMobile,
 		alwaysAllowReadOnly,
 		alwaysAllowWrite,
 		alwaysAllowExecute,

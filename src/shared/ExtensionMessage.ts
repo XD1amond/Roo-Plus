@@ -40,6 +40,8 @@ export interface ExtensionMessage {
 		| "autoApprovalEnabled"
 		| "updateCustomMode"
 		| "deleteCustomMode"
+		| "mobile_action"
+		| "mobile_action_result"
 	text?: string
 	action?:
 		| "chatButtonClicked"
@@ -88,6 +90,7 @@ export interface ExtensionState {
 	alwaysAllowWrite?: boolean
 	alwaysAllowExecute?: boolean
 	alwaysAllowBrowser?: boolean
+	alwaysAllowMobile?: boolean
 	alwaysAllowMcp?: boolean
 	alwaysApproveResubmit?: boolean
 	requestDelaySeconds: number
@@ -133,6 +136,7 @@ export type ClineAsk =
 	| "resume_completed_task"
 	| "mistake_limit_reached"
 	| "browser_action_launch"
+	| "mobile_action"
 	| "use_mcp_server"
 
 export type ClineSay =
@@ -151,6 +155,8 @@ export type ClineSay =
 	| "shell_integration_warning"
 	| "browser_action"
 	| "browser_action_result"
+	| "mobile_action"
+	| "mobile_action_result"
 	| "command"
 	| "mcp_server_request_started"
 	| "mcp_server_response"
@@ -176,10 +182,26 @@ export interface ClineSayTool {
 export const browserActions = ["launch", "click", "type", "scroll_down", "scroll_up", "close"] as const
 export type BrowserAction = (typeof browserActions)[number]
 
+export const mobileActions = ["launch", "tap", "swipe", "type", "rotate", "close"] as const
+export type MobileAction = (typeof mobileActions)[number]
+
 export interface ClineSayBrowserAction {
 	action: BrowserAction
 	coordinate?: string
 	text?: string
+}
+
+export interface ClineSayMobileAction {
+	action: MobileAction
+	deviceId?: string
+	platform?: "ios" | "android"
+	deviceName?: string
+	coordinate?: string
+	startCoordinate?: string
+	endCoordinate?: string
+	duration?: number
+	text?: string
+	orientation?: "portrait" | "landscape"
 }
 
 export type BrowserActionResult = {
@@ -187,6 +209,22 @@ export type BrowserActionResult = {
 	logs?: string
 	currentUrl?: string
 	currentMousePosition?: string
+}
+
+export type MobileActionResult = {
+	screenshot?: string
+	logs?: string
+	deviceInfo?: {
+		id: string
+		name: string
+		platform: "ios" | "android"
+	}
+	deviceList?: Array<{
+		id: string
+		name: string
+		platform: "ios" | "android"
+		status: string
+	}>
 }
 
 export interface ClineAskUseMcpServer {
