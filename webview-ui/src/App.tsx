@@ -9,6 +9,7 @@ import { ExtensionStateContextProvider, useExtensionState } from "./context/Exte
 import { vscode } from "./utils/vscode"
 import McpView from "./components/mcp/McpView"
 import PromptsView from "./components/prompts/PromptsView"
+import MessagingView from "./components/messaging/MessagingView"
 
 const AppContent = () => {
 	const { didHydrateState, showWelcome, shouldShowAnnouncement } = useExtensionState()
@@ -16,6 +17,7 @@ const AppContent = () => {
 	const [showHistory, setShowHistory] = useState(false)
 	const [showMcp, setShowMcp] = useState(false)
 	const [showPrompts, setShowPrompts] = useState(false)
+	const [showMessaging, setShowMessaging] = useState(false)
 	const [showAnnouncement, setShowAnnouncement] = useState(false)
 
 	const handleMessage = useCallback((e: MessageEvent) => {
@@ -52,6 +54,14 @@ const AppContent = () => {
 						setShowHistory(false)
 						setShowMcp(false)
 						setShowPrompts(false)
+						setShowMessaging(false)
+						break
+					case "messagingButtonClicked":
+						setShowSettings(false)
+						setShowHistory(false)
+						setShowMcp(false)
+						setShowPrompts(false)
+						setShowMessaging(true)
 						break
 				}
 				break
@@ -81,6 +91,7 @@ const AppContent = () => {
 					{showHistory && <HistoryView onDone={() => setShowHistory(false)} />}
 					{showMcp && <McpView onDone={() => setShowMcp(false)} />}
 					{showPrompts && <PromptsView onDone={() => setShowPrompts(false)} />}
+					{showMessaging && <MessagingView onDone={() => setShowMessaging(false)} />}
 					{/* Do not conditionally load ChatView, it's expensive and there's state we don't want to lose (user input, disableInput, askResponse promise, etc.) */}
 					<ChatView
 						showHistoryView={() => {
@@ -89,7 +100,7 @@ const AppContent = () => {
 							setShowPrompts(false)
 							setShowHistory(true)
 						}}
-						isHidden={showSettings || showHistory || showMcp || showPrompts}
+						isHidden={showSettings || showHistory || showMcp || showPrompts || showMessaging}
 						showAnnouncement={showAnnouncement}
 						hideAnnouncement={() => {
 							setShowAnnouncement(false)

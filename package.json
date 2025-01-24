@@ -98,6 +98,11 @@
 				"icon": "$(settings-gear)"
 			},
 			{
+				"command": "roo-cline.messagingButtonClicked",
+				"title": "Messaging",
+				"icon": "$(comment-discussion)"
+			},
+			{
 				"command": "roo-cline.openInNewTab",
 				"title": "Open In New Tab",
 				"category": "Roo Code"
@@ -131,8 +136,13 @@
 					"when": "view == roo-cline.SidebarProvider"
 				},
 				{
-					"command": "roo-cline.settingsButtonClicked",
+					"command": "roo-cline.messagingButtonClicked",
 					"group": "navigation@6",
+					"when": "view == roo-cline.SidebarProvider"
+				},
+				{
+					"command": "roo-cline.settingsButtonClicked",
+					"group": "navigation@7",
 					"when": "view == roo-cline.SidebarProvider"
 				}
 			]
@@ -187,7 +197,6 @@
 		"test": "jest && npm run test:webview",
 		"test:webview": "cd webview-ui && npm run test",
 		"test:extension": "vscode-test",
-		"prepare": "husky",
 		"publish:marketplace": "vsce publish && ovsx publish",
 		"publish": "npm run build && changeset publish && npm install --package-lock-only",
 		"version-packages": "changeset version && npm install --package-lock-only",
@@ -214,10 +223,8 @@
 		"dotenv": "^16.4.7",
 		"esbuild": "^0.24.0",
 		"eslint": "^8.57.0",
-		"husky": "^9.1.7",
 		"jest": "^29.7.0",
 		"jest-simple-dot-reporter": "^1.0.5",
-		"lint-staged": "^15.2.11",
 		"npm-run-all": "^4.1.5",
 		"prettier": "^3.4.2",
 		"ts-jest": "^29.2.5",
@@ -267,14 +274,5 @@
 		"turndown": "^7.2.0",
 		"web-tree-sitter": "^0.22.6",
 		"zod": "^3.23.8"
-	},
-	"lint-staged": {
-		"*.{js,jsx,ts,tsx,json,css,md}": [
-			"prettier --write"
-		],
-		"src/**/*.{ts,tsx}": [
-			"prettier --write",
-			"npx eslint -c .eslintrc.json --fix"
-		]
 	}
 }

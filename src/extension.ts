@@ -100,6 +100,12 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand("roo-cline.openInNewTab", openClineInNewTab))
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand("roo-cline.messagingButtonClicked", () => {
+			sidebarProvider.postMessageToWebview({ type: "action", action: "messagingButtonClicked" })
+		}),
+	)
+
+	context.subscriptions.push(
 		vscode.commands.registerCommand("roo-cline.settingsButtonClicked", () => {
 			//vscode.window.showInformationMessage(message)
 			sidebarProvider.postMessageToWebview({ type: "action", action: "settingsButtonClicked" })
